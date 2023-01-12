@@ -1,6 +1,6 @@
 # VectorNav Composite Data Packet
 #
-# Only the enabled fields will be populated with data and only the fields 
+# Only the enabled fields will be populated with data and only the fields
 # you require for your application should be enabled to conserve bandwidth
 # and increase the update rate.
 #
