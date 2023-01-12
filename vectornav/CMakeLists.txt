@@ -13,7 +13,7 @@ endif()
 
 # TODO[DERECK] fix library warnings
 # if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-#   add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+# add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 # endif()
 
 # find dependencies
@@ -31,7 +31,7 @@ add_subdirectory(vnproglib-1.2.0.0/cpp)
 # vectornav
 add_executable(${PROJECT_NAME} src/vectornav.cc)
 ament_target_dependencies(${PROJECT_NAME} rclcpp geometry_msgs vectornav_msgs)
-target_link_libraries(${PROJECT_NAME} vncxx )
+target_link_libraries(${PROJECT_NAME} vncxx)
 
 # vn_sensor_msgs
 add_executable(vn_sensor_msgs src/vn_sensor_msgs.cc)
@@ -52,9 +52,12 @@ install(DIRECTORY
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
-  list(APPEND AMENT_LINT_AUTO_EXCLUDE ament_cmake_copyright)
 endif()
 
+# if(BUILD_TESTING)
+# find_package(ament_cmake_clang_format REQUIRED)
+# ament_clang_format()
+# endif()
 ament_export_dependencies(rosidl_default_runtime)
 
 ament_package()
