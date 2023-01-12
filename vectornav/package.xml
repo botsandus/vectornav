@@ -19,7 +19,12 @@
   <depend version_gte="1.2.0">rosidl_adapter</depend> 
 
   <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_lint_cmake</test_depend>
+  <test_depend>ament_cmake_xmllint</test_depend>
+
+  <exec_depend>ament_lint_auto</exec_depend>
+  <exec_depend>ament_cmake_lint_cmake</exec_depend>
+  <exec_depend>ament_cmake_xmllint</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
