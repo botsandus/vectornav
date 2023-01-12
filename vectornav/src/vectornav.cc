@@ -35,8 +35,8 @@
 
 using namespace std::chrono_literals;
 
-// Assure that the serial port is set to async low latency in order to reduce delays and package pilup.
-// These changes will stay effective until the device is unplugged
+// Assure that the serial port is set to async low latency in order to reduce delays and package
+// pilup. These changes will stay effective until the device is unplugged
 
 class Vectornav : public rclcpp::Node
 {
