@@ -21,7 +21,7 @@
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
 #include "sensor_msgs/msg/temperature.hpp"
 #include "sensor_msgs/msg/time_reference.hpp"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "vectornav_msgs/msg/attitude_group.hpp"
 #include "vectornav_msgs/msg/common_group.hpp"
 #include "vectornav_msgs/msg/gps_group.hpp"
@@ -180,8 +180,11 @@ private:
       q_ned2enu.setRPY(M_PI, 0.0, M_PI / 2);
       msg.orientation = toMsg(q_ned2enu * q);
 
-      msg.angular_velocity = msg_in->angularrate;
-      msg.linear_acceleration = msg_in->accel;
+      // NED to ENU conversion
+      // swap x and y and negate z
+      msg.angular_velocity.x = msg_in->angularrate.y;
+      msg.angular_velocity.y = msg_in->angularrate.x;
+      msg.angular_velocity.z = -msg_in->angularrate.z;
 
       fill_covariance_from_param("orientation_covariance", msg.orientation_covariance);
       fill_covariance_from_param("angular_velocity_covariance", msg.angular_velocity_covariance);
@@ -195,8 +198,17 @@ private:
     {
       sensor_msgs::msg::Imu msg;
       msg.header = msg_in->header;
-      msg.angular_velocity = msg_in->imu_rate;
-      msg.linear_acceleration = msg_in->imu_accel;
+      // NED to ENU conversion
+      // swap x and y and negate z
+      msg.angular_velocity.x = msg_in->imu_rate.y;
+      msg.angular_velocity.y = msg_in->imu_rate.x;
+      msg.angular_velocity.z = -msg_in->imu_rate.z;
+
+      // NED to ENU conversion
+      // swap x and y and negate z
+      msg.linear_acceleration.x = msg_in->imu_accel.y;
+      msg.linear_acceleration.y = msg_in->imu_accel.x;
+      msg.linear_acceleration.z = -msg_in->imu_accel.z;
 
       fill_covariance_from_param("angular_velocity_covariance", msg.angular_velocity_covariance);
       fill_covariance_from_param(
