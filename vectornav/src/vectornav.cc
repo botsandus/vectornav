@@ -241,7 +241,9 @@ private:
         vs_.disconnect();
       }
     } catch (...) {
-      // Don't care
+      // Do care!
+      std::exception_ptr p = std::current_exception();
+      RCLCPP_ERROR(get_logger(), "Error connecting to sensor: %s", p.__cxa_exception_type()->name());
     }
   }
 
@@ -278,7 +280,9 @@ private:
           break;
         }
       } catch (...) {
-        // Don't care...
+        // Do care!
+        std::exception_ptr p = std::current_exception();
+        RCLCPP_ERROR(get_logger(), "Error connecting to sensor: %s", p.__cxa_exception_type()->name());
       }
     }
 
