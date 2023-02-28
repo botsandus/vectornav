@@ -187,7 +187,7 @@ public:
     if (vs_){
       vs_->unregisterErrorPacketReceivedHandler();
       vs_->unregisterAsyncPacketReceivedHandler();
-      if (vs_->isConnected()) 
+      if (vs_->isConnected())
         vs_->disconnect();
       vs_.reset();
     }
