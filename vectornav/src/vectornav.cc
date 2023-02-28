@@ -172,6 +172,7 @@ public:
 
     // Monitor Connection
     if (reconnect_ms > 0ms) {
+      RCLCPP_INFO(get_logger(), "Reconnect Timeout : %ld", reconnect_ms.count());
       reconnect_timer_ =
         create_wall_timer(reconnect_ms, std::bind(&Vectornav::reconnect_timer, this));
     }
@@ -183,9 +184,14 @@ public:
       reconnect_timer_->cancel();
       reconnect_timer_.reset();
     }
-    vs_.unregisterErrorPacketReceivedHandler();
-    vs_.unregisterAsyncPacketReceivedHandler();
-    vs_.disconnect();
+    if (vs_){
+      vs_->unregisterErrorPacketReceivedHandler();
+      vs_->unregisterAsyncPacketReceivedHandler();
+      if (vs_->isConnected()) 
+        vs_->disconnect();
+      vs_.reset();
+    }
+
   }
 
 private:
@@ -229,21 +235,27 @@ private:
   void reconnect_timer()
   {
     // Check if the sensor is connected
-    if (vs_.verifySensorConnectivity()) {
+    if (vs_ && vs_->verifySensorConnectivity()) {
       return;
     }
 
     // Try to reconnect
     try {
+      if (vs_->isConnected())
+        vs_->disconnect();
       std::string port = get_parameter("port").as_string();
       int baud = get_parameter("baud").as_int();
-      if (!connect(port, baud)) {
-        vs_.disconnect();
+      if (!optimize_serial_communication(port)) {
+        RCLCPP_WARN(get_logger(), "time of message delivery may be compromised!");
       }
-    } catch (...) {
+
+
+      if (!connect(port, baud)) {
+        RCLCPP_WARN(get_logger(), "Failed to reconnect to sensor");
+      }
+    } catch (std::exception & e) {
       // Do care!
-      std::exception_ptr p = std::current_exception();
-      RCLCPP_ERROR(get_logger(), "Error connecting to sensor: %s", p.__cxa_exception_type()->name());
+      RCLCPP_ERROR(get_logger(), "Error connecting to sensor: %s", e.what());
     }
   }
 
@@ -258,12 +270,16 @@ private:
    */
   bool connect(const std::string port, const int baud)
   {
+    RCLCPP_INFO(get_logger(), "Starting to connect");
+    if(vs_)
+      vs_.reset();
+    vs_ = std::make_shared<vn::sensors::VnSensor>();
     // Default response was too low and retransmit time was too long by default.
-    vs_.setResponseTimeoutMs(1000);  // ms
-    vs_.setRetransmitDelayMs(50);    // ms
+    vs_->setResponseTimeoutMs(1000);  // ms
+    vs_->setRetransmitDelayMs(50);    // ms
 
     // Check if the requested baud rate is supported
-    auto baudrates = vs_.supportedBaudrates();
+    auto baudrates = vs_->supportedBaudrates();
     if (baud > 0 && std::find(baudrates.begin(), baudrates.end(), baud) == baudrates.end()) {
       RCLCPP_FATAL(get_logger(), "Baudrate Not Supported: %d", baud);
       return false;
@@ -274,41 +290,41 @@ private:
     baudrates.insert(baudrates.begin(), baud);
     for (auto b : baudrates) {
       try {
-        vs_.connect(port, b);
+        vs_->connect(port, b);
 
-        if (vs_.verifySensorConnectivity()) {
+        if (vs_->verifySensorConnectivity()) {
           break;
         }
-      } catch (...) {
-        // Do care!
-        std::exception_ptr p = std::current_exception();
-        RCLCPP_ERROR(get_logger(), "Error connecting to sensor: %s", p.__cxa_exception_type()->name());
+        vs_->disconnect();
+      } catch (std::exception & e) {
+        // Switching this to debug to stop spamming the console, we still log an error in the reconnect timer
+        RCLCPP_DEBUG(get_logger(), "Error connecting while trying baud rates: %s:%s:%d", e.what(), port.c_str(), b);
       }
     }
 
     // Restore Factory Settings for consistency
     // TODO(Dereck): Move factoryReset to Service Call?
-    // vs_.restoreFactorySettings();
+    // vs_->restoreFactorySettings();
 
     // Configure the sensor to the requested baudrate
-    if (baud > 0 && baud != vs_.baudrate()) {
-      vs_.changeBaudRate(baud);
+    if (baud > 0 && baud != vs_->baudrate()) {
+      vs_->changeBaudRate(baud);
     }
 
     // Verify connection one more time
-    if (!vs_.verifySensorConnectivity()) {
+    if (!vs_->verifySensorConnectivity()) {
       RCLCPP_ERROR(get_logger(), "Unable to connect via %s", port.c_str());
       return false;
     }
 
     // Query the sensor's model number.
-    std::string mn = vs_.readModelNumber();
-    std::string fv = vs_.readFirmwareVersion();
-    uint32_t hv = vs_.readHardwareRevision();
-    uint32_t sn = vs_.readSerialNumber();
-    std::string ut = vs_.readUserTag();
+    std::string mn = vs_->readModelNumber();
+    std::string fv = vs_->readFirmwareVersion();
+    uint32_t hv = vs_->readHardwareRevision();
+    uint32_t sn = vs_->readSerialNumber();
+    std::string ut = vs_->readUserTag();
 
-    RCLCPP_INFO(get_logger(), "Connected to %s @ %d baud", port.c_str(), vs_.baudrate());
+    RCLCPP_INFO(get_logger(), "Connected to %s @ %d baud", port.c_str(), vs_->baudrate());
     RCLCPP_INFO(get_logger(), "Model: %s", mn.c_str());
     RCLCPP_INFO(get_logger(), "Firmware Version: %s", fv.c_str());
     RCLCPP_INFO(get_logger(), "Hardware Version : %d", hv);
@@ -320,22 +336,22 @@ private:
     //
 
     // Register Error Callback
-    vs_.registerErrorPacketReceivedHandler(this, Vectornav::ErrorPacketReceivedHandler);
+    vs_->registerErrorPacketReceivedHandler(this, Vectornav::ErrorPacketReceivedHandler);
 
     // TODO(Dereck): Move writeUserTag to Service Call?
     // 5.2.1
-    // vs_.writeUserTag("");
+    // vs_->writeUserTag("");
 
     // Async Output Type
     // 5.2.7
     auto AsyncDataOutputType =
       (vn::protocol::uart::AsciiAsync)get_parameter("AsyncDataOutputType").as_int();
-    vs_.writeAsyncDataOutputType(AsyncDataOutputType);
+    vs_->writeAsyncDataOutputType(AsyncDataOutputType);
 
     // Async output Frequency (Hz)
     // 5.2.8
     int AsyncDataOutputFreq = get_parameter("AsyncDataOutputFrequency").as_int();
-    vs_.writeAsyncDataOutputFrequency(AsyncDataOutputFreq);
+    vs_->writeAsyncDataOutputFrequency(AsyncDataOutputFreq);
 
     // Sync control
     // 5.2.9
@@ -354,7 +370,7 @@ private:
     ;
     configSync.syncOutPulseWidth = get_parameter("syncOutPulseWidth_ns").as_int();
     ;
-    vs_.writeSynchronizationControl(configSync);
+    vs_->writeSynchronizationControl(configSync);
 
     // Communication Protocol Control
     // 5.2.10
@@ -369,7 +385,7 @@ private:
     configComm.spiChecksum =
       (vn::protocol::uart::ChecksumMode)get_parameter("spiChecksum").as_int();
     configComm.errorMode = (vn::protocol::uart::ErrorMode)get_parameter("errorMode").as_int();
-    vs_.writeCommunicationProtocolControl(configComm);
+    vs_->writeCommunicationProtocolControl(configComm);
 
     // Binary Output Register 1
     // 5.2.11
@@ -385,7 +401,7 @@ private:
       (vn::protocol::uart::AttitudeGroup)get_parameter("BO1.attitudeField").as_int();
     configBO1.insField = (vn::protocol::uart::InsGroup)get_parameter("BO1.insField").as_int();
     configBO1.gps2Field = (vn::protocol::uart::GpsGroup)get_parameter("BO1.gps2Field").as_int();
-    vs_.writeBinaryOutput1(configBO1);
+    vs_->writeBinaryOutput1(configBO1);
 
     // Binary Output Register 2
     // 5.2.12
@@ -401,7 +417,7 @@ private:
       (vn::protocol::uart::AttitudeGroup)get_parameter("BO2.attitudeField").as_int();
     configBO2.insField = (vn::protocol::uart::InsGroup)get_parameter("BO2.insField").as_int();
     configBO2.gps2Field = (vn::protocol::uart::GpsGroup)get_parameter("BO2.gps2Field").as_int();
-    vs_.writeBinaryOutput2(configBO2);
+    vs_->writeBinaryOutput2(configBO2);
 
     // Binary Output Register 3
     // 5.2.13
@@ -417,22 +433,22 @@ private:
       (vn::protocol::uart::AttitudeGroup)get_parameter("BO3.attitudeField").as_int();
     configBO3.insField = (vn::protocol::uart::InsGroup)get_parameter("BO3.insField").as_int();
     configBO3.gps2Field = (vn::protocol::uart::GpsGroup)get_parameter("BO3.gps2Field").as_int();
-    vs_.writeBinaryOutput3(configBO3);
+    vs_->writeBinaryOutput3(configBO3);
 
-    // If the sensor is from the VN100 family skip the GPS init completely as it doesn't have 
+    // If the sensor is from the VN100 family skip the GPS init completely as it doesn't have
     // GNSS
-    if (vs_.determineDeviceFamily() != vn::sensors::VnSensor::VnSensor_Family_Vn100) {
+    if (vs_->determineDeviceFamily() != vn::sensors::VnSensor::VnSensor_Family_Vn100) {
       try {
         // GPS Configuration
         // 8.2.1
-        auto gps_config = vs_.readGpsConfiguration();
+        auto gps_config = vs_->readGpsConfiguration();
         RCLCPP_INFO(get_logger(), "GPS Mode       : %d", gps_config.mode);
         RCLCPP_INFO(get_logger(), "GPS PPS Source : %d", gps_config.ppsSource);
         /// TODO(Dereck): VnSensor::readGpsConfiguration() missing fields
 
         // GPS Offset
         // 8.2.2
-        auto gps_offset = vs_.readGpsAntennaOffset();
+        auto gps_offset = vs_->readGpsAntennaOffset();
         RCLCPP_INFO(
           get_logger(), "GPS Offset     : (%f, %f, %f)", gps_offset[0], gps_offset[1], gps_offset[2]);
 
@@ -440,8 +456,8 @@ private:
         // 8.2.3
         // According to dawonn, readGpsCompassBaseline is likely only available
         // on the VN-300
-        if (vs_.determineDeviceFamily() == vn::sensors::VnSensor::VnSensor_Family_Vn300) {
-          auto gps_baseline = vs_.readGpsCompassBaseline();
+        if (vs_->determineDeviceFamily() == vn::sensors::VnSensor::VnSensor_Family_Vn300) {
+          auto gps_baseline = vs_->readGpsCompassBaseline();
           RCLCPP_INFO(
             get_logger(), "GPS Baseline     : (%f, %f, %f), (%f, %f, %f)", gps_baseline.position[0],
             gps_baseline.position[1], gps_baseline.position[2], gps_baseline.uncertainty[0],
@@ -452,7 +468,7 @@ private:
       }
     }
     // Register Binary Data Callback
-    vs_.registerAsyncPacketReceivedHandler(this, Vectornav::AsyncPacketReceivedHandler);
+    vs_->registerAsyncPacketReceivedHandler(this, Vectornav::AsyncPacketReceivedHandler);
     // Connection Successful
     return true;
   }
@@ -1211,7 +1227,7 @@ private:
   //
 
   /// VectorNav Sensor Handle
-  vn::sensors::VnSensor vs_;
+  std::shared_ptr<vn::sensors::VnSensor> vs_;
 
   /// Reconnection Timer
   rclcpp::TimerBase::SharedPtr reconnect_timer_;
