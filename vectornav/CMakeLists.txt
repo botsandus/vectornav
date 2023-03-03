@@ -20,6 +20,7 @@ endif()
 # TODO[DERECK] Move to auto-dep macro
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(vectornav_msgs REQUIRED)
@@ -30,8 +31,8 @@ add_subdirectory(vnproglib-1.2.0.0/cpp)
 
 # vectornav
 add_executable(${PROJECT_NAME} src/vectornav.cc)
-ament_target_dependencies(${PROJECT_NAME} rclcpp geometry_msgs vectornav_msgs)
-target_link_libraries(${PROJECT_NAME} vncxx)
+ament_target_dependencies(${PROJECT_NAME} rclcpp geometry_msgs vectornav_msgs rclcpp_action)
+target_link_libraries(${PROJECT_NAME} vncxx )
 
 # vn_sensor_msgs
 add_executable(vn_sensor_msgs src/vn_sensor_msgs.cc)
