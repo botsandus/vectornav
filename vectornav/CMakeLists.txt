@@ -32,7 +32,7 @@ add_subdirectory(vnproglib-1.2.0.0/cpp)
 # vectornav
 add_executable(${PROJECT_NAME} src/vectornav.cc)
 ament_target_dependencies(${PROJECT_NAME} rclcpp geometry_msgs vectornav_msgs rclcpp_action)
-target_link_libraries(${PROJECT_NAME} vncxx )
+target_link_libraries(${PROJECT_NAME} vncxx)
 
 # vn_sensor_msgs
 add_executable(vn_sensor_msgs src/vn_sensor_msgs.cc)
