@@ -49,6 +49,9 @@ public:
       "linear_acceleration_covariance", linear_acceleration_covariance_);
     declare_parameter<std::vector<double>>("magnetic_covariance", magnetic_field_covariance_);
 
+    declare_parameter<bool>("gravity_removed_accel", true);
+    get_parameter("gravity_removed_accel", gravity_removed_accel_);
+
     //
     // Publishers
     //
@@ -113,7 +116,7 @@ private:
   /** Convert VN common group data to ROS2 standard message types
    *
    */
-  void sub_vn_common(const vectornav_msgs::msg::CommonGroup::SharedPtr msg_in) const
+  void sub_vn_common(const vectornav_msgs::msg::CommonGroup::SharedPtr msg_in)
   {
     // RCLCPP_INFO(get_logger(), "Frame ID: '%s'", msg_in->header.frame_id.c_str());
 
@@ -186,9 +189,10 @@ private:
       msg.angular_velocity.y = msg_in->angularrate.x;
       msg.angular_velocity.z = -msg_in->angularrate.z;
       
-      msg.linear_acceleration.x = msg_in->accel.y;
-      msg.linear_acceleration.y = msg_in->accel.x;
-      msg.linear_acceleration.z = -msg_in->accel.z;      
+      if (!gravity_removed_accel_) {
+        linear_accel_ = msg_in->accel;
+      }
+      msg.linear_acceleration = linear_accel_;
 
       fill_covariance_from_param("orientation_covariance", msg.orientation_covariance);
       fill_covariance_from_param("angular_velocity_covariance", msg.angular_velocity_covariance);
@@ -339,7 +343,11 @@ private:
   /** Convert VN attitude group data to ROS2 standard message types
    *
    */
-  void sub_vn_attitude(const vectornav_msgs::msg::AttitudeGroup::SharedPtr msg_in) const {}
+  void sub_vn_attitude(const vectornav_msgs::msg::AttitudeGroup::SharedPtr msg_in) {
+    if (gravity_removed_accel_) {
+      linear_accel_ = msg_in->linearaccelbody;
+    }
+  }
 
   /** Convert VN ins group data to ROS2 standard message types
    *
@@ -439,11 +447,16 @@ private:
   const std::vector<double> magnetic_field_covariance_ = {0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
                                                           0.0000, 0.0000, 0.0000, 0.0000};
 
+
+  // Params
+  bool gravity_removed_accel_;
+
   /// TODO(Dereck): Find default covariance values
 
   // State Vars
   uint8_t gps_fix_ = vectornav_msgs::msg::GpsGroup::GPSFIX_NOFIX;
   geometry_msgs::msg::Vector3 gps_posu_;
+  geometry_msgs::msg::Vector3 linear_accel_;
   geometry_msgs::msg::Vector3 ins_velbody_;
   geometry_msgs::msg::Point ins_posecef_;
 };
