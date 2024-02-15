@@ -188,7 +188,7 @@ private:
       msg.angular_velocity.x = msg_in->angularrate.y;
       msg.angular_velocity.y = msg_in->angularrate.x;
       msg.angular_velocity.z = -msg_in->angularrate.z;
-      
+
       if (!gravity_removed_accel_) {
         linear_accel_ = msg_in->accel;
       }
@@ -343,7 +343,8 @@ private:
   /** Convert VN attitude group data to ROS2 standard message types
    *
    */
-  void sub_vn_attitude(const vectornav_msgs::msg::AttitudeGroup::SharedPtr msg_in) {
+  void sub_vn_attitude(const vectornav_msgs::msg::AttitudeGroup::SharedPtr msg_in)
+  {
     if (gravity_removed_accel_) {
       linear_accel_ = msg_in->linearaccelbody;
     }
@@ -446,7 +447,6 @@ private:
   /// Default magnetic field Covariance
   const std::vector<double> magnetic_field_covariance_ = {0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
                                                           0.0000, 0.0000, 0.0000, 0.0000};
-
 
   // Params
   bool gravity_removed_accel_;
