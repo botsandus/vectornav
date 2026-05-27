@@ -26,6 +26,16 @@ find_package(geometry_msgs REQUIRED)
 find_package(vectornav_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
+if(NOT COMMAND ament_target_dependencies)
+  macro(ament_target_dependencies target)
+    foreach(dep ${ARGN})
+      if(DEFINED ${dep}_TARGETS)
+        target_link_libraries(${target} ${${dep}_TARGETS})
+      endif()
+    endforeach()
+  endmacro()
+endif()
+
 # vncxx
 add_subdirectory(vnproglib-1.2.0.0/cpp)
 
